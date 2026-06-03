@@ -117,8 +117,17 @@
         const premios = Array.from({length: numSecciones}, (_, i) => i + 1);
         const colores = ["#e63946", "#f1faee", "#a8dadc", "#457b9d", "#1d3557"];
         
-        // ÚNICOS CÓDIGOS VÁLIDOS (Todos caen en $1) - Sensibles a mayúsculas
-        let codigosValidos = ["AVJ200", "AVJ0B", "AVJ&09", "AVJ551"];
+        // GRAN LISTA DE CÓDIGOS VÁLIDOS (Todos caen en $1) - Sensibles a mayúsculas
+        let codigosValidos = [
+            "AVJ200", "AVJ0B", "AVJ&09", "AVJ551", 
+            "AVJVIP", "AVJPRO", "AVJGOD", "AVJMAX",
+            "AVJ777", "AVJ888", "AVJ999", "AVJ111",
+            "AVJWIN", "AVJTOP", "AVJX1", "AVJZ9",
+            "AVJ001", "AVJ002", "AVJ003", "AVJ004",
+            "AVJ005", "AVJ006", "AVJ007", "AVJ008",
+            "AVJ009", "AVJ010", "AVJ2026", "AVJWP",
+            "AVJXD", "AVJONE", "AVJULT", "AVJBEST"
+        ];
         
         let rotacionActual = 0;
         let girando = false;
@@ -156,7 +165,7 @@
             const inputCodigo = document.getElementById("codigo").value.trim();
             let premioIndex;
 
-            // Validación: Solo acepta los 4 códigos exactos
+            // Validación: Solo acepta los códigos de la lista
             if (codigosValidos.includes(inputCodigo)) {
                 premioIndex = 0; // Índice 0 corresponde a $1 SIEMPRE
                 // Desactiva el código tras usarlo
