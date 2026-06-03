@@ -21,11 +21,57 @@
         h1 {
             color: #fca311;
             margin-bottom: 5px;
+            text-align: center;
+        }
+
+        /* PANTALLA 1: FACTURA */
+        #pantalla-factura {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #14213d;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        #pantalla-factura p {
+            color: #a8dadc;
+            margin-bottom: 20px;
+        }
+
+        /* PANTALLA 2: RULETA (Oculta al inicio) */
+        #pantalla-ruleta {
+            display: none; 
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* PANTALLA 3: YA JUGÓ (Bloqueo total) */
+        #pantalla-final {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            background-color: #14213d;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        #premio-texto {
+            font-size: 24px;
+            font-weight: bold;
+            color: #a8dadc;
+            margin-top: 20px;
+            line-height: 1.5;
         }
 
         .controls {
             margin-bottom: 20px;
             text-align: center;
+            margin-top: 10px;
         }
 
         input {
@@ -34,7 +80,9 @@
             border-radius: 5px;
             border: none;
             outline: none;
-            margin-right: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+            width: 250px;
         }
 
         button {
@@ -47,6 +95,8 @@
             cursor: pointer;
             font-weight: bold;
             transition: background 0.3s;
+            width: 100%;
+            max-width: 200px;
         }
 
         button:hover {
@@ -57,6 +107,7 @@
             position: relative;
             width: 300px;
             height: 300px;
+            margin-top: 10px;
         }
 
         .pointer {
@@ -92,39 +143,103 @@
 </head>
 <body>
 
-    <h1>AVJ COMMUNITY</h1>
-    <p>Introduce tu código para girar la ruleta</p>
-
-    <div class="controls">
-        <input type="text" id="codigo" placeholder="Ingresa tu código..." autocomplete="off">
-        <button onclick="girarRuleta()">GIRAR</button>
+    <!-- PANTALLA 1: FACTURA -->
+    <div id="pantalla-factura">
+        <h1>AVJ COMMUNITY</h1>
+        <p>Introduce tu número de factura para acceder a la ruleta</p>
+        <input type="text" id="input-factura" placeholder="Ej: 00001704h-ñ0270" autocomplete="off">
+        <button onclick="verificarFactura()">VERIFICAR</button>
     </div>
 
-    <div class="wheel-container">
-        <div class="pointer"></div>
-        <canvas id="wheel" width="300" height="300"></canvas>
+    <!-- PANTALLA 2: RULETA -->
+    <div id="pantalla-ruleta">
+        <h1>AVJ COMMUNITY</h1>
+        <p>Introduce tu código para girar</p>
+
+        <div class="controls" id="caja-controles">
+            <input type="text" id="codigo" placeholder="Ingresa tu código..." autocomplete="off">
+            <button onclick="girarRuleta()">GIRAR</button>
+        </div>
+
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <canvas id="wheel" width="300" height="300"></canvas>
+        </div>
+
+        <div id="result"></div>
     </div>
 
-    <div id="result"></div>
+    <!-- PANTALLA 3: BLOQUEO POST-GIRO -->
+    <div id="pantalla-final">
+        <h1>AVJ COMMUNITY</h1>
+        <div id="premio-texto"></div>
+    </div>
 
     <script>
+        // --- 1. SISTEMA DE FACTURAS Y BLOQUEO ---
+        const listaFacturas = [
+            "00001704h-ñ0270", "00001705a-x1829", "00001706b-z3491", 
+            "00001707c-y5520", "00001708d-w7714", "00001709e-v9102", 
+            "00001710f-u2384", "00001711g-t4657", "00001712i-s6930", 
+            "00001713j-r8145", "00001714k-q0256", "00001715l-p1948", 
+            "00001716m-o3762", "00001717n-m5893", "00001718p-l8021"
+        ];
+        
+        let facturasValidas = JSON.parse(localStorage.getItem("memoriaFacturasAVJ")) || listaFacturas;
+
+        // VERIFICACIÓN AL CARGAR LA PÁGINA
+        window.onload = function() {
+            const yaGiro = localStorage.getItem("yaGiroAVJ");
+            const premioGuardado = localStorage.getItem("premioAVJ");
+
+            if (yaGiro === "true") {
+                // Si ya jugó alguna vez, se bloquea todo y solo ve su resultado
+                document.getElementById("pantalla-factura").style.display = "none";
+                document.getElementById("pantalla-ruleta").style.display = "none";
+                document.getElementById("pantalla-final").style.display = "flex";
+                document.getElementById("premio-texto").innerHTML = `Ya utilizaste tu giro.<br>Tu premio fue: $${premioGuardado}<br><br>🎉 AVJ COMMUNITY 🎉`;
+            } else if (localStorage.getItem("accesoPermitidoAVJ") === "true") {
+                // Si puso factura pero no ha girado
+                document.getElementById("pantalla-factura").style.display = "none";
+                document.getElementById("pantalla-ruleta").style.display = "flex";
+                dibujarRuleta();
+            }
+        };
+
+        function verificarFactura() {
+            const inputFac = document.getElementById("input-factura").value.trim().toLowerCase(); 
+            
+            if (facturasValidas.includes(inputFac)) {
+                // Quemar factura
+                facturasValidas = facturasValidas.filter(f => f !== inputFac);
+                localStorage.setItem("memoriaFacturasAVJ", JSON.stringify(facturasValidas));
+                
+                // Dar acceso
+                localStorage.setItem("accesoPermitidoAVJ", "true");
+                
+                document.getElementById("pantalla-factura").style.display = "none";
+                document.getElementById("pantalla-ruleta").style.display = "flex";
+                dibujarRuleta();
+            } else {
+                alert("Factura inválida, incorrecta o ya utilizada.");
+            }
+        }
+
+        // --- 2. SISTEMA DE RULETA Y CÓDIGOS ---
         const canvas = document.getElementById("wheel");
         const ctx = canvas.getContext("2d");
         const resultText = document.getElementById("result");
         
-        // Configuración de la ruleta (premios del 1 al 20)
         const numSecciones = 20;
         const premios = Array.from({length: numSecciones}, (_, i) => i + 1);
         const colores = ["#e63946", "#f1faee", "#a8dadc", "#457b9d", "#1d3557"];
         
-        // CÓDIGOS DE MÁXIMO $5 (Caen entre $1 y $5)
-        let codigosMax5 = [
+        const listaMax5 = [
             "AVJ47X", "AVJ92B", "AVJ15M", "AVJ83K", "AVJ61P", 
             "AVJ29R", "AVJ54T", "AVJ76Y", "AVJ38W", "AVJ05L"
         ];
 
-        // 100 CÓDIGOS DE $1 (SIEMPRE caen en $1)
-        let codigosValidos = [
+        const listaValidos = [
             "AVJ200", "AVJ0B", "AVJ&09", "AVJ551",
             "AVJ928", "AVJ704", "AVJ891", "AVJ741", "AVJ582", "AVJ193", "AVJ604", "AVJ837", "AVJ259", "AVJ470",
             "AVJ916", "AVJ358", "AVJ821", "AVJ503", "AVJ769", "AVJ142", "AVJ985", "AVJ374", "AVJ610", "AVJ297",
@@ -138,10 +253,12 @@
             "AVJ159", "AVJ736", "AVJ958", "AVJ402", "AVJ613", "AVJ825", "AVJ397", "AVJ506", "AVJ784", "AVJ248"
         ];
         
+        let codigosMax5 = JSON.parse(localStorage.getItem("memoriaAVJMax5")) || listaMax5;
+        let codigosValidos = JSON.parse(localStorage.getItem("memoriaAVJValidos")) || listaValidos;
+
         let rotacionActual = 0;
         let girando = false;
 
-        // Dibujar la ruleta
         function dibujarRuleta() {
             const arco = (2 * Math.PI) / numSecciones;
             for (let i = 0; i < numSecciones; i++) {
@@ -153,7 +270,6 @@
                 ctx.lineTo(150, 150);
                 ctx.fill();
                 
-                // Texto de los premios
                 ctx.save();
                 ctx.translate(150, 150);
                 ctx.rotate(angulo + arco / 2);
@@ -165,46 +281,46 @@
             }
         }
 
-        dibujarRuleta();
-
         function girarRuleta() {
             if (girando) return;
             
-            // Toma el código exactamente como lo escribe el usuario
             const inputCodigo = document.getElementById("codigo").value.trim();
             let premioIndex;
 
-            // Validación de códigos y selección de premios
             if (codigosValidos.includes(inputCodigo)) {
-                // Si es de los 100 códigos, SIEMPRE gana $1 (Índice 0)
                 premioIndex = 0; 
                 codigosValidos = codigosValidos.filter(c => c !== inputCodigo);
+                localStorage.setItem("memoriaAVJValidos", JSON.stringify(codigosValidos));
+
             } else if (codigosMax5.includes(inputCodigo)) {
-                // Si es de los 10 códigos, gana al azar un número del 0 al 4 ($1 al $5)
                 premioIndex = Math.floor(Math.random() * 5); 
                 codigosMax5 = codigosMax5.filter(c => c !== inputCodigo);
+                localStorage.setItem("memoriaAVJMax5", JSON.stringify(codigosMax5));
+
             } else {
                 alert("Código inválido o ya utilizado. Asegúrate de respetar las mayúsculas.");
                 return;
             }
 
-            girando = true;
-            resultText.innerText = "";
+            // BLOQUEO INMEDIATO EN MEMORIA (Para evitar trampas recargando)
+            localStorage.setItem("yaGiroAVJ", "true");
+            localStorage.setItem("premioAVJ", premios[premioIndex]);
 
-            // Cálculo de rotación (-90 grados para alinear con la flecha)
+            // Desaparecemos los controles para que no puedan presionar nada más
+            document.getElementById("caja-controles").style.display = "none";
+
+            girando = true;
+            resultText.innerText = "Girando...";
+
             const arcoGrados = 360 / numSecciones;
             const premioRotacion = 360 - (premioIndex * arcoGrados) - (arcoGrados / 2) - 90;
-            
-            // Efecto de giro
             const rotacionFinal = rotacionActual + 1800 + (premioRotacion - (rotacionActual % 360));
             
             canvas.style.transform = `rotate(${rotacionFinal}deg)`;
             rotacionActual = rotacionFinal;
 
-            // Mostrar el resultado después
             setTimeout(() => {
                 girando = false;
-                document.getElementById("codigo").value = ""; 
                 resultText.innerHTML = `¡Felicidades! Ganaste $${premios[premioIndex]}<br>🎉 AVJ COMMUNITY 🎉`;
             }, 4000);
         }
