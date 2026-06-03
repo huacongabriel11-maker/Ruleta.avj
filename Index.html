@@ -117,16 +117,25 @@
         const premios = Array.from({length: numSecciones}, (_, i) => i + 1);
         const colores = ["#e63946", "#f1faee", "#a8dadc", "#457b9d", "#1d3557"];
         
-        // GRAN LISTA DE CÓDIGOS VÁLIDOS (Todos caen en $1) - Sensibles a mayúsculas
+        // CÓDIGOS DE MÁXIMO $5 (Caen entre $1 y $5)
+        let codigosMax5 = [
+            "AVJ47X", "AVJ92B", "AVJ15M", "AVJ83K", "AVJ61P", 
+            "AVJ29R", "AVJ54T", "AVJ76Y", "AVJ38W", "AVJ05L"
+        ];
+
+        // 100 CÓDIGOS DE $1 (SIEMPRE caen en $1)
         let codigosValidos = [
-            "AVJ200", "AVJ0B", "AVJ&09", "AVJ551", 
-            "AVJVIP", "AVJPRO", "AVJGOD", "AVJMAX",
-            "AVJ777", "AVJ888", "AVJ999", "AVJ111",
-            "AVJWIN", "AVJTOP", "AVJX1", "AVJZ9",
-            "AVJ001", "AVJ002", "AVJ003", "AVJ004",
-            "AVJ005", "AVJ006", "AVJ007", "AVJ008",
-            "AVJ009", "AVJ010", "AVJ2026", "AVJWP",
-            "AVJXD", "AVJONE", "AVJULT", "AVJBEST"
+            "AVJ200", "AVJ0B", "AVJ&09", "AVJ551",
+            "AVJ928", "AVJ704", "AVJ891", "AVJ741", "AVJ582", "AVJ193", "AVJ604", "AVJ837", "AVJ259", "AVJ470",
+            "AVJ916", "AVJ358", "AVJ821", "AVJ503", "AVJ769", "AVJ142", "AVJ985", "AVJ374", "AVJ610", "AVJ297",
+            "AVJ846", "AVJ519", "AVJ730", "AVJ482", "AVJ951", "AVJ263", "AVJ708", "AVJ154", "AVJ893", "AVJ427",
+            "AVJ631", "AVJ905", "AVJ386", "AVJ714", "AVJ529", "AVJ180", "AVJ647", "AVJ972", "AVJ305", "AVJ816",
+            "AVJ493", "AVJ250", "AVJ781", "AVJ639", "AVJ108", "AVJ574", "AVJ920", "AVJ361", "AVJ849", "AVJ215",
+            "AVJ796", "AVJ403", "AVJ581", "AVJ934", "AVJ167", "AVJ805", "AVJ279", "AVJ541", "AVJ390", "AVJ628",
+            "AVJ753", "AVJ416", "AVJ850", "AVJ192", "AVJ675", "AVJ308", "AVJ941", "AVJ526", "AVJ870", "AVJ239",
+            "AVJ461", "AVJ718", "AVJ594", "AVJ103", "AVJ862", "AVJ350", "AVJ976", "AVJ281", "AVJ649", "AVJ517",
+            "AVJ430", "AVJ895", "AVJ724", "AVJ168", "AVJ903", "AVJ547", "AVJ219", "AVJ680", "AVJ375", "AVJ842",
+            "AVJ159", "AVJ736", "AVJ958", "AVJ402", "AVJ613", "AVJ825", "AVJ397", "AVJ506", "AVJ784", "AVJ248"
         ];
         
         let rotacionActual = 0;
@@ -165,11 +174,15 @@
             const inputCodigo = document.getElementById("codigo").value.trim();
             let premioIndex;
 
-            // Validación: Solo acepta los códigos de la lista
+            // Validación de códigos y selección de premios
             if (codigosValidos.includes(inputCodigo)) {
-                premioIndex = 0; // Índice 0 corresponde a $1 SIEMPRE
-                // Desactiva el código tras usarlo
+                // Si es de los 100 códigos, SIEMPRE gana $1 (Índice 0)
+                premioIndex = 0; 
                 codigosValidos = codigosValidos.filter(c => c !== inputCodigo);
+            } else if (codigosMax5.includes(inputCodigo)) {
+                // Si es de los 10 códigos, gana al azar un número del 0 al 4 ($1 al $5)
+                premioIndex = Math.floor(Math.random() * 5); 
+                codigosMax5 = codigosMax5.filter(c => c !== inputCodigo);
             } else {
                 alert("Código inválido o ya utilizado. Asegúrate de respetar las mayúsculas.");
                 return;
@@ -178,7 +191,7 @@
             girando = true;
             resultText.innerText = "";
 
-            // Cálculo de rotación (-90 grados para alinear el $1 con la flecha)
+            // Cálculo de rotación (-90 grados para alinear con la flecha)
             const arcoGrados = 360 / numSecciones;
             const premioRotacion = 360 - (premioIndex * arcoGrados) - (arcoGrados / 2) - 90;
             
