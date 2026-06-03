@@ -65,6 +65,7 @@
             font-weight: bold;
             color: #a8dadc;
             margin-top: 20px;
+            margin-bottom: 25px;
             line-height: 1.5;
         }
 
@@ -96,7 +97,7 @@
             font-weight: bold;
             transition: background 0.3s;
             width: 100%;
-            max-width: 200px;
+            max-width: 250px;
         }
 
         button:hover {
@@ -147,7 +148,8 @@
     <div id="pantalla-factura">
         <h1>AVJ COMMUNITY</h1>
         <p>Introduce tu número de factura para acceder a la ruleta</p>
-        <input type="text" id="input-factura" placeholder="Ej: 00001704h-ñ0270" autocomplete="off">
+        <!-- Placeholder corregido con una factura falsa -->
+        <input type="text" id="input-factura" placeholder="Ej: 00001234x-z0000" autocomplete="off">
         <button onclick="verificarFactura()">VERIFICAR</button>
     </div>
 
@@ -173,12 +175,13 @@
     <div id="pantalla-final">
         <h1>AVJ COMMUNITY</h1>
         <div id="premio-texto"></div>
+        <button onclick="resetearParaNuevaFactura()">INGRESAR NUEVA FACTURA</button>
     </div>
 
     <script>
         // --- 1. SISTEMA DE FACTURAS Y BLOQUEO ---
         const listaFacturas = [
-            "05001704h-ñ0270", "00001705a-x1829", "00001706b-z3491", 
+            "00001704h-ñ0270", "00001705a-x1829", "00001706b-z3491", 
             "00001707c-y5520", "00001708d-w7714", "00001709e-v9102", 
             "00001710f-u2384", "00001711g-t4657", "00001712i-s6930", 
             "00001713j-r8145", "00001714k-q0256", "00001715l-p1948", 
@@ -219,10 +222,28 @@
                 
                 document.getElementById("pantalla-factura").style.display = "none";
                 document.getElementById("pantalla-ruleta").style.display = "flex";
+                
+                // Restablecer interfaz de ruleta por si viene de un reset
+                document.getElementById("caja-controles").style.display = "block";
+                document.getElementById("result").innerText = "";
+                
                 dibujarRuleta();
             } else {
                 alert("Factura inválida, incorrecta o ya utilizada.");
             }
+        }
+
+        // FUNCIÓN PARA RESETEAR Y PERMITIR NUEVA COMPRA
+        function resetearParaNuevaFactura() {
+            // Borramos los candados de seguridad de la memoria
+            localStorage.removeItem("yaGiroAVJ");
+            localStorage.removeItem("accesoPermitidoAVJ");
+            localStorage.removeItem("premioAVJ");
+
+            // Ocultamos la pantalla final y regresamos a la pantalla de factura
+            document.getElementById("pantalla-final").style.display = "none";
+            document.getElementById("pantalla-factura").style.display = "flex";
+            document.getElementById("input-factura").value = ""; // Limpiar el input
         }
 
         // --- 2. SISTEMA DE RULETA Y CÓDIGOS ---
@@ -302,11 +323,11 @@
                 return;
             }
 
-            // BLOQUEO INMEDIATO EN MEMORIA (Para evitar trampas recargando)
+            // BLOQUEO INMEDIATO EN MEMORIA
             localStorage.setItem("yaGiroAVJ", "true");
             localStorage.setItem("premioAVJ", premios[premioIndex]);
 
-            // Desaparecemos los controles para que no puedan presionar nada más
+            // Desaparecemos los controles
             document.getElementById("caja-controles").style.display = "none";
 
             girando = true;
@@ -322,8 +343,17 @@
             setTimeout(() => {
                 girando = false;
                 resultText.innerHTML = `¡Felicidades! Ganaste $${premios[premioIndex]}<br>🎉 AVJ COMMUNITY 🎉`;
+                
+                // Mostrar botón de recarga después de ganar
+                setTimeout(() => {
+                    document.getElementById("pantalla-ruleta").style.display = "none";
+                    document.getElementById("pantalla-final").style.display = "flex";
+                    document.getElementById("premio-texto").innerHTML = `Ya utilizaste tu giro.<br>Tu premio fue: $${premios[premioIndex]}<br><br>🎉 AVJ COMMUNITY 🎉`;
+                }, 3000); // Espera 3 segundos para que vean la ruleta detenida antes de bloquear la pantalla
+                
             }, 4000);
         }
     </script>
 </body>
 </html>
+
