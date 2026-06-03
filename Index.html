@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruleta AVJ COMMUNITY</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e2f;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        h1 {
+            color: #fca311;
+            margin-bottom: 5px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            outline: none;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #fca311;
+            color: #14213d;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #e5980b;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+        }
+
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #e63946;
+            z-index: 10;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            transition: transform 4s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #a8dadc;
+            text-align: center;
+            min-height: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>AVJ COMMUNITY</h1>
+    <p>Introduce tu código para girar la ruleta</p>
+
+    <div class="controls">
+        <input type="text" id="codigo" placeholder="Ingresa tu código..." autocomplete="off">
+        <button onclick="girarRuleta()">GIRAR</button>
+    </div>
+
+    <div class="wheel-container">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="300" height="300"></canvas>
+    </div>
+
+    <div id="result"></div>
+
+    <script>
+        const canvas = document.getElementById("wheel");
+        const ctx = canvas.getContext("2d");
+        const resultText = document.getElementById("result");
+        
+        // Configuración de la ruleta (premios del 1 al 20)
+        const numSecciones = 20;
+        const premios = Array.from({length: numSecciones}, (_, i) => i + 1);
+        const colores = ["#e63946", "#f1faee", "#a8dadc", "#457b9d", "#1d3557"];
+        
+        // ÚNICOS CÓDIGOS VÁLIDOS (Todos caen en $1) - Sensibles a mayúsculas
+        let codigosValidos = ["AVJ200", "AVJ0B", "AVJ&09", "AVJ551"];
+        
+        let rotacionActual = 0;
+        let girando = false;
+
+        // Dibujar la ruleta
+        function dibujarRuleta() {
+            const arco = (2 * Math.PI) / numSecciones;
+            for (let i = 0; i < numSecciones; i++) {
+                const angulo = i * arco;
+                ctx.beginPath();
+                ctx.fillStyle = colores[i % colores.length];
+                ctx.moveTo(150, 150);
+                ctx.arc(150, 150, 150, angulo, angulo + arco);
+                ctx.lineTo(150, 150);
+                ctx.fill();
+                
+                // Texto de los premios
+                ctx.save();
+                ctx.translate(150, 150);
+                ctx.rotate(angulo + arco / 2);
+                ctx.textAlign = "right";
+                ctx.fillStyle = (ctx.fillStyle === "#f1faee") ? "#1d3557" : "#fff";
+                ctx.font = "bold 14px Arial";
+                ctx.fillText("$" + premios[i], 135, 5);
+                ctx.restore();
+            }
+        }
+
+        dibujarRuleta();
+
+        function girarRuleta() {
+            if (girando) return;
+            
+            // Toma el código exactamente como lo escribe el usuario
+            const inputCodigo = document.getElementById("codigo").value.trim();
+            let premioIndex;
+
+            // Validación: Solo acepta los 4 códigos exactos
+            if (codigosValidos.includes(inputCodigo)) {
+                premioIndex = 0; // Índice 0 corresponde a $1 SIEMPRE
+                // Desactiva el código tras usarlo
+                codigosValidos = codigosValidos.filter(c => c !== inputCodigo);
+            } else {
+                alert("Código inválido o ya utilizado. Asegúrate de respetar las mayúsculas.");
+                return;
+            }
+
+            girando = true;
+            resultText.innerText = "";
+
+            // Cálculo de rotación (-90 grados para alinear el $1 con la flecha)
+            const arcoGrados = 360 / numSecciones;
+            const premioRotacion = 360 - (premioIndex * arcoGrados) - (arcoGrados / 2) - 90;
+            
+            // Efecto de giro
+            const rotacionFinal = rotacionActual + 1800 + (premioRotacion - (rotacionActual % 360));
+            
+            canvas.style.transform = `rotate(${rotacionFinal}deg)`;
+            rotacionActual = rotacionFinal;
+
+            // Mostrar el resultado después
+            setTimeout(() => {
+                girando = false;
+                document.getElementById("codigo").value = ""; 
+                resultText.innerHTML = `¡Felicidades! Ganaste $${premios[premioIndex]}<br>🎉 AVJ COMMUNITY 🎉`;
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
