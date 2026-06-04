@@ -61,7 +61,7 @@
             text-align: center;
             width: 100%;
             box-sizing: border-box;
-            text-transform: uppercase; /* Ayuda visual al usuario */
+            text-transform: uppercase;
         }
 
         button {
@@ -134,7 +134,6 @@
             transition: transform 0.1s;
         }
 
-        /* Animación del puntero al girar */
         .pointer.ticking {
             animation: tick 0.15s infinite alternate;
         }
@@ -211,7 +210,7 @@
     </div>
 
     <script>
-        // --- SISTEMA DE SONIDOS (Web Audio API para no depender de archivos externos) ---
+        // --- SISTEMA DE SONIDOS ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
         function playTick() {
@@ -223,7 +222,7 @@
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(800, audioCtx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.05);
-            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volumen bajito
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
             osc.start();
             osc.stop(audioCtx.currentTime + 0.05);
@@ -239,13 +238,13 @@
             osc.frequency.setValueAtTime(400, audioCtx.currentTime);
             osc.frequency.setValueAtTime(600, audioCtx.currentTime + 0.1);
             osc.frequency.setValueAtTime(1000, audioCtx.currentTime + 0.2);
-            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); // Volumen victoria
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); 
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
             osc.start();
             osc.stop(audioCtx.currentTime + 1);
         }
 
-        // --- 1. SISTEMA DE FACTURAS Y BLOQUEO ---
+        // --- 1. SISTEMA DE FACTURAS ---
         const listaFacturas = [
             "00001704H-Ñ0270", "00001705A-X1829", "00001706B-Z3491", 
             "00001707C-Y5520", "00001708D-W7714", "00001709E-V9102", 
@@ -254,9 +253,9 @@
             "00001716M-O3762", "00001717N-M5893", "00001718P-L8021"
         ];
         
-        let facturasValidas = JSON.parse(localStorage.getItem("memoriaFacturasAVJ")) || listaFacturas;
+        // CORRECCIÓN: Guardar qué facturas SE USARON (en vez de las disponibles)
+        let facturasUsadas = JSON.parse(localStorage.getItem("facturasUsadasAVJ")) || [];
 
-        // VERIFICACIÓN AL CARGAR LA PÁGINA
         window.onload = function() {
             const yaGiro = localStorage.getItem("yaGiroAVJ");
             const premioGuardado = localStorage.getItem("premioAVJ");
@@ -272,6 +271,16 @@
             }
         };
 
+        function activarRuleta() {
+            localStorage.setItem("accesoPermitidoAVJ", "true");
+            document.getElementById("pantalla-factura").style.display = "none";
+            document.getElementById("pantalla-ruleta").style.display = "flex";
+            document.getElementById("caja-controles").style.display = "block";
+            document.getElementById("result").innerText = "";
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            dibujarRuleta();
+        }
+
         function verificarFactura() {
             const inputFac = document.getElementById("input-factura").value.trim().toUpperCase(); 
             const aceptoTerminos = document.getElementById("terminos").checked;
@@ -280,24 +289,24 @@
                 alert("Debes aceptar los términos y reglas del sorteo para participar.");
                 return;
             }
+
+            // NUEVO: FACTURA DE PRUEBA QUE NUNCA SE QUEMA
+            if (inputFac === "TEST01") {
+                activarRuleta();
+                return;
+            }
             
-            if (facturasValidas.includes(inputFac)) {
-                // Quemar factura
-                facturasValidas = facturasValidas.filter(f => f !== inputFac);
-                localStorage.setItem("memoriaFacturasAVJ", JSON.stringify(facturasValidas));
-                localStorage.setItem("accesoPermitidoAVJ", "true");
-                
-                document.getElementById("pantalla-factura").style.display = "none";
-                document.getElementById("pantalla-ruleta").style.display = "flex";
-                document.getElementById("caja-controles").style.display = "block";
-                document.getElementById("result").innerText = "";
-                
-                // Habilitar audio context con la primera interacción del usuario
-                if(audioCtx.state === 'suspended') audioCtx.resume();
-                
-                dibujarRuleta();
+            if (listaFacturas.includes(inputFac)) {
+                if (facturasUsadas.includes(inputFac)) {
+                    alert("Esta factura ya fue utilizada.");
+                } else {
+                    // Quemar factura guardándola en las usadas
+                    facturasUsadas.push(inputFac);
+                    localStorage.setItem("facturasUsadasAVJ", JSON.stringify(facturasUsadas));
+                    activarRuleta();
+                }
             } else {
-                alert("Factura inválida, incorrecta o ya utilizada.");
+                alert("Factura inválida o incorrecta.");
             }
         }
 
@@ -327,15 +336,14 @@
             "AVJ29R", "AVJ54T", "AVJ76Y", "AVJ38W", "AVJ05L"
         ];
 
-        // Códigos principales que SIEMPRE caerán en 1 (Indice 0)
         const listaValidos = [
             "AVJ200", "AVJ0B", "AVJ&09", "AVJ551",
             "AVJ928", "AVJ704", "AVJ891", "AVJ741", "AVJ582", "AVJ193", "AVJ604", "AVJ837", "AVJ259", "AVJ470",
             "AVJ916", "AVJ358", "AVJ821", "AVJ503", "AVJ769", "AVJ142", "AVJ985", "AVJ374", "AVJ610", "AVJ297"
         ];
         
-        let codigosMax5 = JSON.parse(localStorage.getItem("memoriaAVJMax5")) || listaMax5;
-        let codigosValidos = JSON.parse(localStorage.getItem("memoriaAVJValidos")) || listaValidos;
+        // CORRECCIÓN: Guardar códigos USADOS
+        let codigosUsados = JSON.parse(localStorage.getItem("codigosUsadosAVJ")) || [];
 
         let rotacionActual = 0;
         let girando = false;
@@ -365,22 +373,30 @@
         function girarRuleta() {
             if (girando) return;
             
-            // CONVERSIÓN A MAYÚSCULAS PARA EVITAR TRAMPAS DE REUTILIZACIÓN
             const inputCodigo = document.getElementById("codigo").value.trim().toUpperCase();
             let premioIndex;
 
-            if (codigosValidos.includes(inputCodigo)) {
-                premioIndex = 0; // Fuerzas que caiga siempre en el premio de índice 0 ($1)
-                codigosValidos = codigosValidos.filter(c => c !== inputCodigo);
-                localStorage.setItem("memoriaAVJValidos", JSON.stringify(codigosValidos));
+            // NUEVO: CÓDIGO DE PRUEBA QUE NO SE QUEMA
+            if (inputCodigo === "TESTAVJ") {
+                // Lo hacemos caer en un premio aleatorio para testear la animación
+                premioIndex = Math.floor(Math.random() * numSecciones); 
 
-            } else if (codigosMax5.includes(inputCodigo)) {
+            } else if (codigosUsados.includes(inputCodigo)) {
+                alert("Este código ya fue utilizado.");
+                return;
+
+            } else if (listaValidos.includes(inputCodigo)) {
+                premioIndex = 0; // Fuerzas que caiga siempre en el premio de índice 0 ($1)
+                codigosUsados.push(inputCodigo);
+                localStorage.setItem("codigosUsadosAVJ", JSON.stringify(codigosUsados));
+
+            } else if (listaMax5.includes(inputCodigo)) {
                 premioIndex = Math.floor(Math.random() * 5); 
-                codigosMax5 = codigosMax5.filter(c => c !== inputCodigo);
-                localStorage.setItem("memoriaAVJMax5", JSON.stringify(codigosMax5));
+                codigosUsados.push(inputCodigo);
+                localStorage.setItem("codigosUsadosAVJ", JSON.stringify(codigosUsados));
 
             } else {
-                alert("Código inválido o ya utilizado.");
+                alert("Código inválido.");
                 return;
             }
 
@@ -407,9 +423,8 @@
                 girando = false;
                 puntero.classList.remove("ticking");
                 clearInterval(tickInterval);
-                playWin(); // Sonido de victoria
+                playWin(); 
                 
-                // Lluvia de confeti
                 confetti({
                     particleCount: 150,
                     spread: 80,
@@ -418,14 +433,13 @@
 
                 resultText.innerHTML = `¡Felicidades! Ganaste $${premios[premioIndex]}`;
                 
-                // Redirección a pantalla final
                 setTimeout(() => {
                     document.getElementById("pantalla-ruleta").style.display = "none";
                     document.getElementById("pantalla-final").style.display = "flex";
                     document.getElementById("premio-texto").innerHTML = `Ya utilizaste tu giro.<br><br>Tu premio fue:<br>🎉 $${premios[premioIndex]} 🎉`;
                 }, 3500); 
                 
-            }, 4000); // 4 segundos dura el CSS transition
+            }, 4000); 
         }
 
         function compartirWhatsApp() {
@@ -436,3 +450,4 @@
     </script>
 </body>
 </html>
+
