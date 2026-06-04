@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ruleta AVJ COMMUNITY</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -24,70 +25,47 @@
             text-align: center;
         }
 
-        /* PANTALLA 1: FACTURA */
-        #pantalla-factura {
+        /* CONTENEDORES DE PANTALLA */
+        .pantalla {
             display: flex;
             flex-direction: column;
             align-items: center;
             background-color: #14213d;
-            padding: 40px;
+            padding: 30px;
             border-radius: 15px;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
             text-align: center;
+            width: 90%;
+            max-width: 400px;
+            box-sizing: border-box;
         }
 
-        #pantalla-factura p {
-            color: #a8dadc;
-            margin-bottom: 20px;
-        }
-
-        /* PANTALLA 2: RULETA (Oculta al inicio) */
-        #pantalla-ruleta {
+        #pantalla-ruleta, #pantalla-final {
             display: none; 
-            flex-direction: column;
-            align-items: center;
         }
 
-        /* PANTALLA 3: YA JUGÓ (Bloqueo total) */
-        #pantalla-final {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            background-color: #14213d;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            text-align: center;
-        }
-
-        #premio-texto {
-            font-size: 24px;
-            font-weight: bold;
+        p {
             color: #a8dadc;
-            margin-top: 20px;
-            margin-bottom: 25px;
-            line-height: 1.5;
-        }
-
-        .controls {
             margin-bottom: 20px;
-            text-align: center;
-            margin-top: 10px;
+            font-size: 15px;
         }
 
-        input {
-            padding: 10px;
+        /* FORMULARIOS Y BOTONES */
+        input[type="text"] {
+            padding: 12px;
             font-size: 16px;
             border-radius: 5px;
             border: none;
             outline: none;
             margin-bottom: 15px;
             text-align: center;
-            width: 250px;
+            width: 100%;
+            box-sizing: border-box;
+            text-transform: uppercase; /* Ayuda visual al usuario */
         }
 
         button {
-            padding: 10px 20px;
+            padding: 12px 20px;
             font-size: 16px;
             background-color: #fca311;
             color: #14213d;
@@ -95,19 +73,50 @@
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
-            transition: background 0.3s;
+            transition: background 0.3s, transform 0.1s;
             width: 100%;
-            max-width: 250px;
+            margin-bottom: 10px;
         }
 
         button:hover {
             background-color: #e5980b;
         }
+        
+        button:active {
+            transform: scale(0.98);
+        }
 
+        .btn-whatsapp {
+            background-color: #25D366;
+            color: white;
+        }
+        .btn-whatsapp:hover {
+            background-color: #1ebe57;
+        }
+
+        /* CHECKBOX TÉRMINOS */
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #a8dadc;
+            text-align: left;
+        }
+        .checkbox-container input {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+
+        /* RULETA Y PUNTERO */
         .wheel-container {
             position: relative;
-            width: 300px;
-            height: 300px;
+            width: 100%;
+            max-width: 300px;
+            aspect-ratio: 1 / 1;
             margin-top: 10px;
         }
 
@@ -122,6 +131,17 @@
             border-right: 15px solid transparent;
             border-top: 30px solid #e63946;
             z-index: 10;
+            transition: transform 0.1s;
+        }
+
+        /* Animación del puntero al girar */
+        .pointer.ticking {
+            animation: tick 0.15s infinite alternate;
+        }
+
+        @keyframes tick {
+            0% { transform: translateX(-50%) rotate(0deg); }
+            100% { transform: translateX(-50%) rotate(-15deg); }
         }
 
         canvas {
@@ -134,58 +154,104 @@
 
         #result {
             margin-top: 20px;
-            font-size: 24px;
+            font-size: 22px;
             font-weight: bold;
             color: #a8dadc;
             text-align: center;
             min-height: 30px;
         }
+
+        #premio-texto {
+            font-size: 24px;
+            font-weight: bold;
+            color: #a8dadc;
+            margin-top: 10px;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
 
-    <!-- PANTALLA 1: FACTURA -->
-    <div id="pantalla-factura">
+    <div id="pantalla-factura" class="pantalla">
         <h1>AVJ COMMUNITY</h1>
         <p>Introduce tu número de factura para acceder a la ruleta</p>
-        <!-- Placeholder corregido con una factura falsa -->
-        <input type="text" id="input-factura" placeholder="Ej: 00001234x-z0000" autocomplete="off">
-        <button onclick="verificarFactura()">VERIFICAR</button>
+        <input type="text" id="input-factura" placeholder="Ej: 00001704H-Ñ0270" autocomplete="off">
+        
+        <div class="checkbox-container">
+            <input type="checkbox" id="terminos">
+            <label for="terminos">Acepto los términos y reglas del sorteo.</label>
+        </div>
+
+        <button onclick="verificarFactura()">VERIFICAR FACTURA</button>
     </div>
 
-    <!-- PANTALLA 2: RULETA -->
-    <div id="pantalla-ruleta">
+    <div id="pantalla-ruleta" class="pantalla">
         <h1>AVJ COMMUNITY</h1>
         <p>Introduce tu código para girar</p>
 
-        <div class="controls" id="caja-controles">
-            <input type="text" id="codigo" placeholder="Ingresa tu código..." autocomplete="off">
-            <button onclick="girarRuleta()">GIRAR</button>
+        <div id="caja-controles" style="width: 100%;">
+            <input type="text" id="codigo" placeholder="INGRESA TU CÓDIGO..." autocomplete="off">
+            <button onclick="girarRuleta()">GIRAR RULETA</button>
         </div>
 
         <div class="wheel-container">
-            <div class="pointer"></div>
+            <div class="pointer" id="puntero"></div>
             <canvas id="wheel" width="300" height="300"></canvas>
         </div>
 
         <div id="result"></div>
     </div>
 
-    <!-- PANTALLA 3: BLOQUEO POST-GIRO -->
-    <div id="pantalla-final">
+    <div id="pantalla-final" class="pantalla">
         <h1>AVJ COMMUNITY</h1>
         <div id="premio-texto"></div>
+        <button class="btn-whatsapp" onclick="compartirWhatsApp()">COMPARTIR EN WHATSAPP</button>
         <button onclick="resetearParaNuevaFactura()">INGRESAR NUEVA FACTURA</button>
     </div>
 
     <script>
+        // --- SISTEMA DE SONIDOS (Web Audio API para no depender de archivos externos) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playTick() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.05);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volumen bajito
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+
+        function playWin() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime + 0.1);
+            osc.frequency.setValueAtTime(1000, audioCtx.currentTime + 0.2);
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); // Volumen victoria
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 1);
+        }
+
         // --- 1. SISTEMA DE FACTURAS Y BLOQUEO ---
         const listaFacturas = [
-            "00001704h-ñ0270", "00001705a-x1829", "00001706b-z3491", 
-            "00001707c-y5520", "00001708d-w7714", "00001709e-v9102", 
-            "00001710f-u2384", "00001711g-t4657", "00001712i-s6930", 
-            "00001713j-r8145", "00001714k-q0256", "00001715l-p1948", 
-            "00001716m-o3762", "00001717n-m5893", "00001718p-l8021"
+            "00001704H-Ñ0270", "00001705A-X1829", "00001706B-Z3491", 
+            "00001707C-Y5520", "00001708D-W7714", "00001709E-V9102", 
+            "00001710F-U2384", "00001711G-T4657", "00001712I-S6930", 
+            "00001713J-R8145", "00001714K-Q0256", "00001715L-P1948", 
+            "00001716M-O3762", "00001717N-M5893", "00001718P-L8021"
         ];
         
         let facturasValidas = JSON.parse(localStorage.getItem("memoriaFacturasAVJ")) || listaFacturas;
@@ -196,13 +262,10 @@
             const premioGuardado = localStorage.getItem("premioAVJ");
 
             if (yaGiro === "true") {
-                // Si ya jugó alguna vez, se bloquea todo y solo ve su resultado
                 document.getElementById("pantalla-factura").style.display = "none";
-                document.getElementById("pantalla-ruleta").style.display = "none";
                 document.getElementById("pantalla-final").style.display = "flex";
-                document.getElementById("premio-texto").innerHTML = `Ya utilizaste tu giro.<br>Tu premio fue: $${premioGuardado}<br><br>🎉 AVJ COMMUNITY 🎉`;
+                document.getElementById("premio-texto").innerHTML = `Ya utilizaste tu giro.<br><br>Tu premio fue:<br>🎉 $${premioGuardado} 🎉`;
             } else if (localStorage.getItem("accesoPermitidoAVJ") === "true") {
-                // Si puso factura pero no ha girado
                 document.getElementById("pantalla-factura").style.display = "none";
                 document.getElementById("pantalla-ruleta").style.display = "flex";
                 dibujarRuleta();
@@ -210,22 +273,27 @@
         };
 
         function verificarFactura() {
-            const inputFac = document.getElementById("input-factura").value.trim().toLowerCase(); 
+            const inputFac = document.getElementById("input-factura").value.trim().toUpperCase(); 
+            const aceptoTerminos = document.getElementById("terminos").checked;
+
+            if (!aceptoTerminos) {
+                alert("Debes aceptar los términos y reglas del sorteo para participar.");
+                return;
+            }
             
             if (facturasValidas.includes(inputFac)) {
                 // Quemar factura
                 facturasValidas = facturasValidas.filter(f => f !== inputFac);
                 localStorage.setItem("memoriaFacturasAVJ", JSON.stringify(facturasValidas));
-                
-                // Dar acceso
                 localStorage.setItem("accesoPermitidoAVJ", "true");
                 
                 document.getElementById("pantalla-factura").style.display = "none";
                 document.getElementById("pantalla-ruleta").style.display = "flex";
-                
-                // Restablecer interfaz de ruleta por si viene de un reset
                 document.getElementById("caja-controles").style.display = "block";
                 document.getElementById("result").innerText = "";
+                
+                // Habilitar audio context con la primera interacción del usuario
+                if(audioCtx.state === 'suspended') audioCtx.resume();
                 
                 dibujarRuleta();
             } else {
@@ -233,23 +301,22 @@
             }
         }
 
-        // FUNCIÓN PARA RESETEAR Y PERMITIR NUEVA COMPRA
         function resetearParaNuevaFactura() {
-            // Borramos los candados de seguridad de la memoria
             localStorage.removeItem("yaGiroAVJ");
             localStorage.removeItem("accesoPermitidoAVJ");
             localStorage.removeItem("premioAVJ");
 
-            // Ocultamos la pantalla final y regresamos a la pantalla de factura
             document.getElementById("pantalla-final").style.display = "none";
             document.getElementById("pantalla-factura").style.display = "flex";
-            document.getElementById("input-factura").value = ""; // Limpiar el input
+            document.getElementById("input-factura").value = ""; 
+            document.getElementById("terminos").checked = false;
         }
 
         // --- 2. SISTEMA DE RULETA Y CÓDIGOS ---
         const canvas = document.getElementById("wheel");
         const ctx = canvas.getContext("2d");
         const resultText = document.getElementById("result");
+        const puntero = document.getElementById("puntero");
         
         const numSecciones = 20;
         const premios = Array.from({length: numSecciones}, (_, i) => i + 1);
@@ -260,18 +327,11 @@
             "AVJ29R", "AVJ54T", "AVJ76Y", "AVJ38W", "AVJ05L"
         ];
 
+        // Códigos principales que SIEMPRE caerán en 1 (Indice 0)
         const listaValidos = [
             "AVJ200", "AVJ0B", "AVJ&09", "AVJ551",
             "AVJ928", "AVJ704", "AVJ891", "AVJ741", "AVJ582", "AVJ193", "AVJ604", "AVJ837", "AVJ259", "AVJ470",
-            "AVJ916", "AVJ358", "AVJ821", "AVJ503", "AVJ769", "AVJ142", "AVJ985", "AVJ374", "AVJ610", "AVJ297",
-            "AVJ846", "AVJ519", "AVJ730", "AVJ482", "AVJ951", "AVJ263", "AVJ708", "AVJ154", "AVJ893", "AVJ427",
-            "AVJ631", "AVJ905", "AVJ386", "AVJ714", "AVJ529", "AVJ180", "AVJ647", "AVJ972", "AVJ305", "AVJ816",
-            "AVJ493", "AVJ250", "AVJ781", "AVJ639", "AVJ108", "AVJ574", "AVJ920", "AVJ361", "AVJ849", "AVJ215",
-            "AVJ796", "AVJ403", "AVJ581", "AVJ934", "AVJ167", "AVJ805", "AVJ279", "AVJ541", "AVJ390", "AVJ628",
-            "AVJ753", "AVJ416", "AVJ850", "AVJ192", "AVJ675", "AVJ308", "AVJ941", "AVJ526", "AVJ870", "AVJ239",
-            "AVJ461", "AVJ718", "AVJ594", "AVJ103", "AVJ862", "AVJ350", "AVJ976", "AVJ281", "AVJ649", "AVJ517",
-            "AVJ430", "AVJ895", "AVJ724", "AVJ168", "AVJ903", "AVJ547", "AVJ219", "AVJ680", "AVJ375", "AVJ842",
-            "AVJ159", "AVJ736", "AVJ958", "AVJ402", "AVJ613", "AVJ825", "AVJ397", "AVJ506", "AVJ784", "AVJ248"
+            "AVJ916", "AVJ358", "AVJ821", "AVJ503", "AVJ769", "AVJ142", "AVJ985", "AVJ374", "AVJ610", "AVJ297"
         ];
         
         let codigosMax5 = JSON.parse(localStorage.getItem("memoriaAVJMax5")) || listaMax5;
@@ -305,11 +365,12 @@
         function girarRuleta() {
             if (girando) return;
             
-            const inputCodigo = document.getElementById("codigo").value.trim();
+            // CONVERSIÓN A MAYÚSCULAS PARA EVITAR TRAMPAS DE REUTILIZACIÓN
+            const inputCodigo = document.getElementById("codigo").value.trim().toUpperCase();
             let premioIndex;
 
             if (codigosValidos.includes(inputCodigo)) {
-                premioIndex = 0; 
+                premioIndex = 0; // Fuerzas que caiga siempre en el premio de índice 0 ($1)
                 codigosValidos = codigosValidos.filter(c => c !== inputCodigo);
                 localStorage.setItem("memoriaAVJValidos", JSON.stringify(codigosValidos));
 
@@ -319,19 +380,21 @@
                 localStorage.setItem("memoriaAVJMax5", JSON.stringify(codigosMax5));
 
             } else {
-                alert("Código inválido o ya utilizado. Asegúrate de respetar las mayúsculas.");
+                alert("Código inválido o ya utilizado.");
                 return;
             }
 
-            // BLOQUEO INMEDIATO EN MEMORIA
+            // BLOQUEO INMEDIATO
             localStorage.setItem("yaGiroAVJ", "true");
             localStorage.setItem("premioAVJ", premios[premioIndex]);
 
-            // Desaparecemos los controles
             document.getElementById("caja-controles").style.display = "none";
-
             girando = true;
             resultText.innerText = "Girando...";
+
+            // Animación y Sonido
+            puntero.classList.add("ticking");
+            let tickInterval = setInterval(playTick, 150);
 
             const arcoGrados = 360 / numSecciones;
             const premioRotacion = 360 - (premioIndex * arcoGrados) - (arcoGrados / 2) - 90;
@@ -342,18 +405,34 @@
 
             setTimeout(() => {
                 girando = false;
-                resultText.innerHTML = `¡Felicidades! Ganaste $${premios[premioIndex]}<br>🎉 AVJ COMMUNITY 🎉`;
+                puntero.classList.remove("ticking");
+                clearInterval(tickInterval);
+                playWin(); // Sonido de victoria
                 
-                // Mostrar botón de recarga después de ganar
+                // Lluvia de confeti
+                confetti({
+                    particleCount: 150,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+
+                resultText.innerHTML = `¡Felicidades! Ganaste $${premios[premioIndex]}`;
+                
+                // Redirección a pantalla final
                 setTimeout(() => {
                     document.getElementById("pantalla-ruleta").style.display = "none";
                     document.getElementById("pantalla-final").style.display = "flex";
-                    document.getElementById("premio-texto").innerHTML = `Ya utilizaste tu giro.<br>Tu premio fue: $${premios[premioIndex]}<br><br>🎉 AVJ COMMUNITY 🎉`;
-                }, 3000); // Espera 3 segundos para que vean la ruleta detenida antes de bloquear la pantalla
+                    document.getElementById("premio-texto").innerHTML = `Ya utilizaste tu giro.<br><br>Tu premio fue:<br>🎉 $${premios[premioIndex]} 🎉`;
+                }, 3500); 
                 
-            }, 4000);
+            }, 4000); // 4 segundos dura el CSS transition
+        }
+
+        function compartirWhatsApp() {
+            const premioGanado = localStorage.getItem("premioAVJ");
+            const mensaje = encodeURIComponent(`¡Acabo de ganar $${premioGanado} en la ruleta de AVJ COMMUNITY! 🚀`);
+            window.open(`https://wa.me/?text=${mensaje}`, "_blank");
         }
     </script>
 </body>
 </html>
-
