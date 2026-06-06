@@ -1,133 +1,3 @@
-<?php
-// =====================================================================
-// 1. CONFIGURACIÓN DEL SERVIDOR Y BASE DE DATOS
-// =====================================================================
-$host = 'localhost';
-$dbname = 'avj_community';
-$username = 'tu_usuario';       // CAMBIA ESTO por tu usuario de base de datos
-$password = 'tu_contraseña';    // CAMBIA ESTO por tu contraseña de base de datos
-
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    if(isset($_POST['action'])) {
-        die(json_encode(['status' => 'error', 'msg' => 'Error de conexión a la base de datos.']));
-    } else {
-        die("Error: No se pudo conectar a la base de datos. Verifica tus credenciales.");
-    }
-}
-
-// =====================================================================
-// 2. LÓGICA DE API (RECIBIR Y RESPONDER A LA RULETA)
-// =====================================================================
-if (isset($_POST['action'])) {
-    header('Content-Type: application/json');
-    $action = $_POST['action'];
-
-    // --- VERIFICAR FACTURA ---
-    if ($action === 'verificar_factura') {
-        $factura = strtoupper(trim($_POST['factura'] ?? ''));
-
-        if ($factura === 'TEST01') {
-            echo json_encode(['status' => 'success']);
-            exit;
-        }
-
-        $stmt = $pdo->prepare("SELECT id, estado FROM facturas WHERE numero_factura = ?");
-        $stmt->execute([$factura]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$row) {
-            echo json_encode(['status' => 'error', 'msg' => 'Factura inválida o no registrada.']);
-        } else if ($row['estado'] === 'usada') {
-            echo json_encode(['status' => 'error', 'msg' => 'Esta factura ya fue utilizada.']);
-        } else {
-            echo json_encode(['status' => 'success']);
-        }
-        exit;
-    }
-
-    // --- GIRAR RULETA ---
-    if ($action === 'girar_ruleta') {
-        $factura = strtoupper(trim($_POST['factura'] ?? ''));
-        $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
-
-        // 1. Validar factura nuevamente
-        $factura_id = null;
-        if ($factura !== 'TEST01') {
-            $stmtF = $pdo->prepare("SELECT id, estado FROM facturas WHERE numero_factura = ?");
-            $stmtF->execute([$factura]);
-            $rowF = $stmtF->fetch(PDO::FETCH_ASSOC);
-            if (!$rowF || $rowF['estado'] === 'usada') {
-                echo json_encode(['status' => 'error', 'msg' => 'La factura es inválida o ya fue usada.']);
-                exit;
-            }
-            $factura_id = $rowF['id'];
-        }
-
-        // 2. Validar código
-        $codigo_id = null;
-        $tipo_codigo = 'prueba';
-
-        if ($codigo !== 'TESTAVJ') {
-            $stmtC = $pdo->prepare("SELECT id, tipo, estado FROM codigos WHERE codigo = ?");
-            $stmtC->execute([$codigo]);
-            $rowC = $stmtC->fetch(PDO::FETCH_ASSOC);
-
-            if (!$rowC) {
-                echo json_encode(['status' => 'error', 'msg' => 'Código inválido.']);
-                exit;
-            }
-            if ($rowC['estado'] === 'usado') {
-                echo json_encode(['status' => 'error', 'msg' => 'Este código ya fue utilizado.']);
-                exit;
-            }
-            $codigo_id = $rowC['id'];
-            $tipo_codigo = $rowC['tipo'];
-        }
-
-        // 3. Determinar el premio
-        $premioIndex = 0;
-        if ($tipo_codigo === 'siempre_1') {
-            $premioIndex = 0; // Cae en $1
-        } else if ($tipo_codigo === 'max_5') {
-            $premioIndex = rand(0, 4); // Cae entre $1 y $5
-        } else if ($tipo_codigo === 'prueba') {
-            $premioIndex = rand(0, 19); // Cae en cualquiera
-        }
-
-        $premios = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-        $premioGanado = $premios[$premioIndex];
-
-        // 4. Quemar los datos en la base de datos
-        if ($factura !== 'TEST01' && $codigo !== 'TESTAVJ') {
-            $pdo->beginTransaction();
-            try {
-                $pdo->prepare("UPDATE facturas SET estado = 'usada' WHERE id = ?")->execute([$factura_id]);
-                $pdo->prepare("UPDATE codigos SET estado = 'usado' WHERE id = ?")->execute([$codigo_id]);
-                $pdo->prepare("INSERT INTO historial_premios (factura_id, codigo_id, premio_ganado) VALUES (?, ?, ?)")
-                    ->execute([$factura_id, $codigo_id, $premioGanado]);
-                $pdo->commit();
-            } catch (Exception $e) {
-                $pdo->rollBack();
-                echo json_encode(['status' => 'error', 'msg' => 'Error al registrar el premio.']);
-                exit;
-            }
-        }
-
-        echo json_encode([
-            'status' => 'success',
-            'premioIndex' => $premioIndex,
-            'premioGanado' => $premioGanado
-        ]);
-        exit;
-    }
-}
-// =====================================================================
-// 3. INTERFAZ GRÁFICA (HTML, CSS y JS)
-// =====================================================================
-?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -149,76 +19,154 @@ if (isset($_POST['action'])) {
             overflow: hidden;
         }
 
-        h1 { color: #fca311; margin-bottom: 5px; text-align: center; }
-
-        .pantalla {
-            display: flex; flex-direction: column; align-items: center;
-            background-color: #14213d; padding: 30px; border-radius: 15px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5); text-align: center;
-            width: 90%; max-width: 400px; box-sizing: border-box;
+        h1 {
+            color: #fca311;
+            margin-bottom: 5px;
+            text-align: center;
         }
 
-        #pantalla-ruleta, #pantalla-final { display: none; }
+        /* CONTENEDORES DE PANTALLA */
+        .pantalla {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #14213d;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+            box-sizing: border-box;
+        }
 
-        p { color: #a8dadc; margin-bottom: 20px; font-size: 15px; }
+        #pantalla-ruleta, #pantalla-final {
+            display: none; 
+        }
 
+        p {
+            color: #a8dadc;
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+
+        /* FORMULARIOS Y BOTONES */
         input[type="text"] {
-            padding: 12px; font-size: 16px; border-radius: 5px; border: none;
-            outline: none; margin-bottom: 15px; text-align: center; width: 100%;
-            box-sizing: border-box; text-transform: uppercase;
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            outline: none;
+            margin-bottom: 15px;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            text-transform: uppercase;
         }
 
         button {
-            padding: 12px 20px; font-size: 16px; background-color: #fca311;
-            color: #14213d; border: none; border-radius: 5px; cursor: pointer;
-            font-weight: bold; transition: background 0.3s, transform 0.1s;
-            width: 100%; margin-bottom: 10px;
+            padding: 12px 20px;
+            font-size: 16px;
+            background-color: #fca311;
+            color: #14213d;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s, transform 0.1s;
+            width: 100%;
+            margin-bottom: 10px;
         }
 
-        button:hover { background-color: #e5980b; }
-        button:active { transform: scale(0.98); }
-        .btn-whatsapp { background-color: #25D366; color: white; }
-        .btn-whatsapp:hover { background-color: #1ebe57; }
+        button:hover {
+            background-color: #e5980b;
+        }
+        
+        button:active {
+            transform: scale(0.98);
+        }
 
+        .btn-whatsapp {
+            background-color: #25D366;
+            color: white;
+        }
+        .btn-whatsapp:hover {
+            background-color: #1ebe57;
+        }
+
+        /* CHECKBOX TÉRMINOS */
         .checkbox-container {
-            display: flex; align-items: center; justify-content: center;
-            gap: 10px; margin-bottom: 20px; font-size: 13px; color: #a8dadc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #a8dadc;
             text-align: left;
         }
-        .checkbox-container input { cursor: pointer; width: 18px; height: 18px; }
+        .checkbox-container input {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
 
+        /* RULETA Y PUNTERO */
         .wheel-container {
-            position: relative; width: 100%; max-width: 300px;
-            aspect-ratio: 1 / 1; margin-top: 10px;
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            aspect-ratio: 1 / 1;
+            margin-top: 10px;
         }
 
         .pointer {
-            position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
-            width: 0; height: 0; border-left: 15px solid transparent;
-            border-right: 15px solid transparent; border-top: 30px solid #e63946;
-            z-index: 10; transition: transform 0.1s;
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #e63946;
+            z-index: 10;
+            transition: transform 0.1s;
         }
 
-        .pointer.ticking { animation: tick 0.15s infinite alternate; }
+        .pointer.ticking {
+            animation: tick 0.15s infinite alternate;
+        }
+
         @keyframes tick {
             0% { transform: translateX(-50%) rotate(0deg); }
             100% { transform: translateX(-50%) rotate(-15deg); }
         }
 
         canvas {
-            width: 100%; height: 100%; border-radius: 50%;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
             box-shadow: 0 0 15px rgba(0,0,0,0.5);
             transition: transform 4s cubic-bezier(0.25, 0.1, 0.25, 1);
         }
 
         #result {
-            margin-top: 20px; font-size: 22px; font-weight: bold;
-            color: #a8dadc; text-align: center; min-height: 30px;
+            margin-top: 20px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #a8dadc;
+            text-align: center;
+            min-height: 30px;
         }
 
         #premio-texto {
-            font-size: 24px; font-weight: bold; color: #a8dadc;
-            margin-top: 10px; margin-bottom: 25px; line-height: 1.5;
+            font-size: 24px;
+            font-weight: bold;
+            color: #a8dadc;
+            margin-top: 10px;
+            margin-bottom: 25px;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -262,47 +210,51 @@ if (isset($_POST['action'])) {
     </div>
 
     <script>
+        // --- SISTEMA DE SONIDOS ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
         function playTick() {
             if(audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
-            osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(800, audioCtx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.05);
             gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
         }
 
         function playWin() {
             if(audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
-            osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
             osc.type = 'sine';
             osc.frequency.setValueAtTime(400, audioCtx.currentTime);
             osc.frequency.setValueAtTime(600, audioCtx.currentTime + 0.1);
             osc.frequency.setValueAtTime(1000, audioCtx.currentTime + 0.2);
             gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); 
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
-            osc.start(); osc.stop(audioCtx.currentTime + 1);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 1);
         }
 
-        const canvas = document.getElementById("wheel");
-        const ctx = canvas.getContext("2d");
-        const resultText = document.getElementById("result");
-        const puntero = document.getElementById("puntero");
+        // --- 1. SISTEMA DE FACTURAS ---
+        const listaFacturas = [
+            "00001704H-Ñ0270", "00001705A-X1829", "00001706B-Z3491", 
+            "00001707C-Y5520", "00001708D-W7714", "00001709E-V9102", 
+            "00001710F-U2384", "00001711G-T4657", "00001712I-S6930", 
+            "00001713J-R8145", "00001714K-Q0256", "00001715L-P1948", 
+            "00001716M-O3762", "00001717N-M5893", "00001718P-L8021"
+        ];
         
-        const numSecciones = 20;
-        const premios = Array.from({length: numSecciones}, (_, i) => i + 1);
-        const colores = ["#e63946", "#f1faee", "#a8dadc", "#457b9d", "#1d3557"];
-        
-        let rotacionActual = 0;
-        let girando = false;
-        let facturaActual = ""; 
+        // CORRECCIÓN: Guardar qué facturas SE USARON (en vez de las disponibles)
+        let facturasUsadas = JSON.parse(localStorage.getItem("facturasUsadasAVJ")) || [];
 
         window.onload = function() {
             const yaGiro = localStorage.getItem("yaGiroAVJ");
@@ -312,8 +264,89 @@ if (isset($_POST['action'])) {
                 document.getElementById("pantalla-factura").style.display = "none";
                 document.getElementById("pantalla-final").style.display = "flex";
                 document.getElementById("premio-texto").innerHTML = `Ya utilizaste tu giro.<br><br>Tu premio fue:<br>🎉 $${premioGuardado} 🎉`;
+            } else if (localStorage.getItem("accesoPermitidoAVJ") === "true") {
+                document.getElementById("pantalla-factura").style.display = "none";
+                document.getElementById("pantalla-ruleta").style.display = "flex";
+                dibujarRuleta();
             }
         };
+
+        function activarRuleta() {
+            localStorage.setItem("accesoPermitidoAVJ", "true");
+            document.getElementById("pantalla-factura").style.display = "none";
+            document.getElementById("pantalla-ruleta").style.display = "flex";
+            document.getElementById("caja-controles").style.display = "block";
+            document.getElementById("result").innerText = "";
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            dibujarRuleta();
+        }
+
+        function verificarFactura() {
+            const inputFac = document.getElementById("input-factura").value.trim().toUpperCase(); 
+            const aceptoTerminos = document.getElementById("terminos").checked;
+
+            if (!aceptoTerminos) {
+                alert("Debes aceptar los términos y reglas del sorteo para participar.");
+                return;
+            }
+
+            // NUEVO: FACTURA DE PRUEBA QUE NUNCA SE QUEMA
+            if (inputFac === "TEST01") {
+                activarRuleta();
+                return;
+            }
+            
+            if (listaFacturas.includes(inputFac)) {
+                if (facturasUsadas.includes(inputFac)) {
+                    alert("Esta factura ya fue utilizada.");
+                } else {
+                    // Quemar factura guardándola en las usadas
+                    facturasUsadas.push(inputFac);
+                    localStorage.setItem("facturasUsadasAVJ", JSON.stringify(facturasUsadas));
+                    activarRuleta();
+                }
+            } else {
+                alert("Factura inválida o incorrecta.");
+            }
+        }
+
+        function resetearParaNuevaFactura() {
+            localStorage.removeItem("yaGiroAVJ");
+            localStorage.removeItem("accesoPermitidoAVJ");
+            localStorage.removeItem("premioAVJ");
+
+            document.getElementById("pantalla-final").style.display = "none";
+            document.getElementById("pantalla-factura").style.display = "flex";
+            document.getElementById("input-factura").value = ""; 
+            document.getElementById("terminos").checked = false;
+        }
+
+        // --- 2. SISTEMA DE RULETA Y CÓDIGOS ---
+        const canvas = document.getElementById("wheel");
+        const ctx = canvas.getContext("2d");
+        const resultText = document.getElementById("result");
+        const puntero = document.getElementById("puntero");
+        
+        const numSecciones = 20;
+        const premios = Array.from({length: numSecciones}, (_, i) => i + 1);
+        const colores = ["#e63946", "#f1faee", "#a8dadc", "#457b9d", "#1d3557"];
+        
+        const listaMax5 = [
+            "AVJ47X", "AVJ92B", "AVJ15M", "AVJ83K", "AVJ61P", 
+            "AVJ29R", "AVJ54T", "AVJ76Y", "AVJ38W", "AVJ05L"
+        ];
+
+        const listaValidos = [
+            "AVJ200", "AVJ0B", "AVJ&09", "AVJ551",
+            "AVJ928", "AVJ704", "AVJ891", "AVJ741", "AVJ582", "AVJ193", "AVJ604", "AVJ837", "AVJ259", "AVJ470",
+            "AVJ916", "AVJ358", "AVJ821", "AVJ503", "AVJ769", "AVJ142", "AVJ985", "AVJ374", "AVJ610", "AVJ297"
+        ];
+        
+        // CORRECCIÓN: Guardar códigos USADOS
+        let codigosUsados = JSON.parse(localStorage.getItem("codigosUsadosAVJ")) || [];
+
+        let rotacionActual = 0;
+        let girando = false;
 
         function dibujarRuleta() {
             const arco = (2 * Math.PI) / numSecciones;
@@ -337,77 +370,45 @@ if (isset($_POST['action'])) {
             }
         }
 
-        async function verificarFactura() {
-            const inputFac = document.getElementById("input-factura").value.trim().toUpperCase(); 
-            const aceptoTerminos = document.getElementById("terminos").checked;
-
-            if (!aceptoTerminos) {
-                alert("Debes aceptar los términos y reglas del sorteo.");
-                return;
-            }
-            if (inputFac === "") {
-                alert("Por favor, ingresa una factura.");
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append("action", "verificar_factura");
-            formData.append("factura", inputFac);
-
-            try {
-                // Al enviar a "", el código PHP superior procesa la petición
-                const response = await fetch("", { method: "POST", body: formData });
-                const data = await response.json();
-
-                if (data.status === "success") {
-                    facturaActual = inputFac;
-                    document.getElementById("pantalla-factura").style.display = "none";
-                    document.getElementById("pantalla-ruleta").style.display = "flex";
-                    if(audioCtx.state === 'suspended') audioCtx.resume();
-                    dibujarRuleta();
-                } else {
-                    alert(data.msg); 
-                }
-            } catch (error) {
-                alert("Error al conectar con el servidor.");
-            }
-        }
-
-        async function girarRuleta() {
+        function girarRuleta() {
             if (girando) return;
+            
             const inputCodigo = document.getElementById("codigo").value.trim().toUpperCase();
-            if (inputCodigo === "") {
-                alert("Ingresa un código para girar.");
+            let premioIndex;
+
+            // NUEVO: CÓDIGO DE PRUEBA QUE NO SE QUEMA
+            if (inputCodigo === "TESTAVJ") {
+                // Lo hacemos caer en un premio aleatorio para testear la animación
+                premioIndex = Math.floor(Math.random() * numSecciones); 
+
+            } else if (codigosUsados.includes(inputCodigo)) {
+                alert("Este código ya fue utilizado.");
+                return;
+
+            } else if (listaValidos.includes(inputCodigo)) {
+                premioIndex = 0; // Fuerzas que caiga siempre en el premio de índice 0 ($1)
+                codigosUsados.push(inputCodigo);
+                localStorage.setItem("codigosUsadosAVJ", JSON.stringify(codigosUsados));
+
+            } else if (listaMax5.includes(inputCodigo)) {
+                premioIndex = Math.floor(Math.random() * 5); 
+                codigosUsados.push(inputCodigo);
+                localStorage.setItem("codigosUsadosAVJ", JSON.stringify(codigosUsados));
+
+            } else {
+                alert("Código inválido.");
                 return;
             }
 
-            const formData = new FormData();
-            formData.append("action", "girar_ruleta");
-            formData.append("factura", facturaActual);
-            formData.append("codigo", inputCodigo);
+            // BLOQUEO INMEDIATO
+            localStorage.setItem("yaGiroAVJ", "true");
+            localStorage.setItem("premioAVJ", premios[premioIndex]);
 
-            try {
-                const response = await fetch("", { method: "POST", body: formData });
-                const data = await response.json();
-
-                if (data.status === "error") {
-                    alert(data.msg); 
-                    return;
-                }
-                ejecutarAnimacionRuleta(data.premioIndex, data.premioGanado);
-            } catch (error) {
-                alert("Error de conexión al procesar tu premio.");
-            }
-        }
-
-        function ejecutarAnimacionRuleta(premioIndex, premioGanado) {
-            girando = true;
             document.getElementById("caja-controles").style.display = "none";
+            girando = true;
             resultText.innerText = "Girando...";
 
-            localStorage.setItem("yaGiroAVJ", "true");
-            localStorage.setItem("premioAVJ", premioGanado);
-
+            // Animación y Sonido
             puntero.classList.add("ticking");
             let tickInterval = setInterval(playTick, 150);
 
@@ -424,30 +425,21 @@ if (isset($_POST['action'])) {
                 clearInterval(tickInterval);
                 playWin(); 
                 
-                confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+                confetti({
+                    particleCount: 150,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
 
-                resultText.innerHTML = `¡Felicidades! Ganaste $${premioGanado}`;
+                resultText.innerHTML = `¡Felicidades! Ganaste $${premios[premioIndex]}`;
                 
                 setTimeout(() => {
                     document.getElementById("pantalla-ruleta").style.display = "none";
                     document.getElementById("pantalla-final").style.display = "flex";
-                    document.getElementById("premio-texto").innerHTML = `Ya utilizaste tu giro.<br><br>Tu premio fue:<br>🎉 $${premioGanado} 🎉`;
+                    document.getElementById("premio-texto").innerHTML = `Ya utilizaste tu giro.<br><br>Tu premio fue:<br>🎉 $${premios[premioIndex]} 🎉`;
                 }, 3500); 
                 
             }, 4000); 
-        }
-
-        function resetearParaNuevaFactura() {
-            localStorage.removeItem("yaGiroAVJ");
-            localStorage.removeItem("premioAVJ");
-            facturaActual = "";
-            document.getElementById("pantalla-final").style.display = "none";
-            document.getElementById("pantalla-factura").style.display = "flex";
-            document.getElementById("input-factura").value = ""; 
-            document.getElementById("terminos").checked = false;
-            document.getElementById("codigo").value = "";
-            document.getElementById("caja-controles").style.display = "block";
-            document.getElementById("result").innerText = "";
         }
 
         function compartirWhatsApp() {
@@ -458,5 +450,3 @@ if (isset($_POST['action'])) {
     </script>
 </body>
 </html>
-
-
